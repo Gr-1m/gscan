@@ -6532,18 +6532,16 @@ var NmapServices = func() []string {
 	return r
 }()
 
-func PortInfoList(ports []int) map[int]string {
-	var rt = make(map[int]string)
+func PortInfoList(ports []int) (rt map[int]string) {
 
 	all := NmapServices
 	for _, p := range ports {
 		rt[p] = all[p+1]
 	}
-	return rt
+	return
 }
 
-func PortListProc(args string) []int {
-	var ports []int
+func PortListProc(args string) (ports []int) {
 	//Please pass in the parameters in strings.Join(os.Args[1:], "") format
 	for _, pgroup := range strings.Split(args, ",") {
 		if strings.Contains(pgroup, "-") && strings.Count(pgroup, "-") == 1 {
@@ -6562,5 +6560,5 @@ func PortListProc(args string) []int {
 		}
 	}
 	sort.Ints(ports)
-	return ports
+	return
 }

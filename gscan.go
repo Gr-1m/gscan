@@ -1,20 +1,17 @@
 package main
 
 import (
-	"fmt"
-	"net"
-	// "sync"
 	"flag"
+	"fmt"
 	"gscan/config"
-	"os"
+	"net"
 	"sort"
-	"strings"
 	"time"
 )
 
-var version = "v0.6.1"
+var version = "v0.7.2"
 
-func portInfo() {
+func portInfo(ptl string) {
 	// This function is Copy from another file, still in the Development Stage
 
 	var args string
@@ -22,8 +19,10 @@ func portInfo() {
 	var dfps = []int{23, 25, 53, 88, 139, 389, 443, 445, 3389, 5432}
 	// default show some port info
 
-	if len(os.Args) > 1 {
-		args = strings.Join(os.Args[1:], "")
+	if len(ptl) > 1 {
+		// plt -> os.Args can be a single go.file
+		// args = strings.Join(ptl[1:], "")
+		args = ptl
 		ports = config.PortListProc(args)
 	} else {
 		ports = dfps
@@ -35,16 +34,12 @@ func portInfo() {
 		fmt.Printf("%d: %s\n", port, infos[port])
 	}
 
-	//for port, info := range config.PortInfoList(ports) {
-	//	fmt.Printf("%d: %s\n", port, info)
-	//}
 }
 
-func portScan(host string, timeout int, thread int) []int {
+func portScan(host string, timeout int, thread int) (openports []int) {
 	// The default recommended Thread is 700
 	// The default recommended Timeout is 60
 
-	var openports []int
 	ports := make(chan int, thread)
 	results := make(chan int)
 
@@ -69,7 +64,7 @@ func portScan(host string, timeout int, thread int) []int {
 	close(results)
 	sort.Ints(openports)
 
-	return openports
+	return
 }
 
 func worker(host string, adjusttimeout int, ports chan int, results chan int) {
@@ -100,33 +95,46 @@ func main() {
 	start := time.Now()
 	Banner(start)
 
-	var openports []int
-
-	timeout := flag.Int("to", 60, "Config Output nmapCommand max port number")
-	threads := flag.Int("th", 650, "Config Output nmapCommand max port number")
-	max_portnum := flag.Int("n", 20, "Config Output nmapCommand max port number")
+	var (
+		openports []int
+		timeout   int
+		threads   int
+	)
+	flag.IntVar(&timeout, "to", 60, "Config TCP wait Timeout")
+	flag.IntVar(&threads, "th", 650, "Config Max Thread you want")
 	target := flag.String("ip", "", "The Target Host IPaddress for Scan")
-	pinfo := flag.Bool("pi", false, "Still in the Development Stage")
+
+	max_portnum := flag.Int("n", 20, "Config Output nmapCommand max port number")
+	pinfo := flag.String("pi", "", "Still in the Development Stage")
 	flag.Parse()
 
-	if *pinfo {
-		portInfo()
-		return
+	if *pinfo != "" {
+		fmt.Println("The Port INFO you want is as follows : ")
+		portInfo(*pinfo)
+		if *target == "" {
+			return
+		}
 	}
 
 	if *target == "" {
 		flag.Usage()
 		return
+	} else {
+		var waittime = 65536 * (float64(timeout) + 1.581) / float64(threads)
+		fmt.Printf("\n[!] Please wait for about %.3fs\r", waittime/1000)
 	}
-	openports = portScan(*target, *timeout, *threads)
+	openports = portScan(*target, timeout, threads)
 	portnum := len(openports)
 
 	for _, port := range openports {
 		fmt.Printf("%d is open\n", port)
 	}
-	// fmt.Printf("[*] 扫描结束,耗时: %s\n\n", time.Since(start))
-	fmt.Printf("[*] Gscan Finish, scanned in: %s\n", time.Since(start))
+	fmt.Printf("[*] Gscan Finish, scanned in: %.3f\n", time.Since(start).Seconds())
 
+	// nmap command output
+	if portnum == 0 {
+		fmt.Println("Detect No Port Open")
+	}
 	if portnum < *max_portnum {
 		fmt.Printf("You can use: \n\t nmap %s -p", *target)
 		for _, port := range openports {
