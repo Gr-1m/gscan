@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const Version = "v0.9.2a"
+const Version = "v0.9.3a"
 
 type Bar struct {
 	percent uint8
