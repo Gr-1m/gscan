@@ -42,12 +42,11 @@ func (b *Bar) setRate(incret int) {
 }
 
 func (b *Bar) Play(cur chan int) {
-	var jdt = "-\\|/"
-
 	for b.current = range cur {
 		b.setRate(int(b.getPercent() - b.percent))
 
-		fmt.Printf("\r\x1b[01;40;36m>[%c][%-100s]%3d%% \x1b[0m%8d/%d\x1b[K\r", jdt[b.current%len(jdt)], b.rate, b.percent, b.current, b.total)
+		fmt.Printf("\r\x1b[01;40;36m>[%c][%-100s]%3d%% \x1b[0m%8d/%d\x1b[K\r", 'x', b.rate, b.percent, b.current, b.total)
+		//jdt[b.current%len(jdt)]
 	}
 }
 
@@ -104,11 +103,13 @@ func portScan(host string, timeout int, thread int) (openports []int, opennum in
 	}
 
 	go func() {
-		// curnum := make(chan int)
-		// Play(curnum, 65535)
+		curnum := make(chan int)
+		Play(curnum, 65535)
 		for i := range 65535 {
-			// curnum <- i
 			ports <- i + 1
+			if i%6 == 0 {
+				curnum <- i
+			}
 		}
 	}()
 
