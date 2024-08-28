@@ -104,15 +104,15 @@ func portScan(host string, timeout int, thread int) (openports []int, opennum in
 	}
 
 	go func() {
-		curnum := make(chan int)
-		Play(curnum, 65535)
-		for i := 1; i < 65536; i++ {
-			curnum <- i
-			ports <- i
+		// curnum := make(chan int)
+		// Play(curnum, 65535)
+		for i := range 65535 {
+			// curnum <- i
+			ports <- i + 1
 		}
 	}()
 
-	for i := 1; i < 65536; i++ {
+	for range 65535 {
 		port := <-results
 		if port != 0 {
 			openports = append(openports, port)
