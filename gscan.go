@@ -9,7 +9,47 @@ import (
 	"time"
 )
 
-var version = "v0.7.2"
+const Version = "v0.9.2a"
+
+type Bar struct {
+	percent uint8
+	current int
+	total   int
+	rate    string
+	graph   string
+
+	// pgchan chan int
+}
+
+func (b *Bar) getPercent() uint8 {
+	return uint8(float32(b.current) / float32(b.total) * 100)
+}
+
+func (b *Bar) setRate(incret int) {
+
+	switch incret {
+	case 0:
+	case 1:
+		b.rate += b.graph
+		b.percent = b.getPercent()
+	default:
+		for i := 0; i < incret; i++ {
+			b.rate += b.graph
+		}
+		b.percent = b.getPercent()
+	}
+
+}
+
+func (b *Bar) Play(cur chan int) {
+	var jdt = "-\\|/"
+
+	for b.current = range cur {
+		b.setRate(int(b.getPercent() - b.percent))
+
+		fmt.Printf("\r\x1b[01;40;36m>[%c][%-100s]%3d%% \x1b[0m%8d/%d\x1b[K\r", jdt[b.current%len(jdt)], b.rate, b.percent, b.current, b.total)
+	}
+}
 
 func portInfo(ptl string) {
 	// This function is Copy from another file, still in the Development Stage
@@ -36,19 +76,38 @@ func portInfo(ptl string) {
 
 }
 
-func portScan(host string, timeout int, thread int) (openports []int) {
+func Play(cur chan int, v int) {
+	//
+	// With Channel Optimization, there is no longer a need for prior InitBar first to improve performance
+	var DefaultBar Bar
+
+	DefaultBar.graph = "#"
+	DefaultBar.total = v
+	DefaultBar.current = 0
+	DefaultBar.setRate(0)
+
+	go DefaultBar.Play(cur)
+}
+
+func portScan(host string, timeout int, thread int) (openports []int, opennum int) {
 	// The default recommended Thread is 700
 	// The default recommended Timeout is 60
 
 	ports := make(chan int, thread)
 	results := make(chan int)
 
+	defer close(ports)
+	defer close(results)
+
 	for i := 1; i < cap(ports); i++ {
 		go worker(host, timeout, ports, results)
 	}
 
 	go func() {
+		curnum := make(chan int)
+		Play(curnum, 65535)
 		for i := 1; i < 65536; i++ {
+			curnum <- i
 			ports <- i
 		}
 	}()
@@ -60,9 +119,8 @@ func portScan(host string, timeout int, thread int) (openports []int) {
 		}
 	}
 
-	close(ports)
-	close(results)
 	sort.Ints(openports)
+	opennum = len(openports)
 
 	return
 }
@@ -75,7 +133,7 @@ func worker(host string, adjusttimeout int, ports chan int, results chan int) {
 			results <- 0
 			continue
 		}
-		conn.Close()
+		defer conn.Close()
 		results <- p
 	}
 }
@@ -83,7 +141,7 @@ func worker(host string, adjusttimeout int, ports chan int, results chan int) {
 func Banner(start time.Time) {
 
 	var banner string
-	banner = "Starting Gscan " + version + "(github.com/Gr-1m/Gscan)"
+	banner = "Starting Gscan " + Version + "(github.com/Gr-1m/gscan)"
 
 	fmt.Printf("%s at %v\n", banner, start.Format("2006-01-02 15:04 MST"))
 
@@ -121,27 +179,27 @@ func main() {
 		return
 	} else {
 		var waittime = 65536 * (float64(timeout) + 1.581) / float64(threads)
-		fmt.Printf("\n[!] Please wait for about %.3fs\r", waittime/1000)
+		fmt.Printf("\n[!] Please wait for about %.3fs\n\r", waittime/1000)
 	}
-	openports = portScan(*target, timeout, threads)
-	portnum := len(openports)
+	openports, opennum := portScan(*target, timeout, threads)
 
+	fmt.Println("\nresults: ")
 	for _, port := range openports {
 		fmt.Printf("%d is open\n", port)
 	}
 	fmt.Printf("[*] Gscan Finish, scanned in: %.3f\n", time.Since(start).Seconds())
 
 	// nmap command output
-	if portnum == 0 {
+	if opennum == 0 {
 		fmt.Println("Detect No Port Open")
 	}
-	if portnum < *max_portnum {
+	if opennum < *max_portnum {
 		fmt.Printf("You can use: \n\t nmap %s -p", *target)
 		for _, port := range openports {
 			fmt.Printf("%d,", port)
 		}
 		fmt.Println("\b \n\nTo Check services running on these ports")
 	} else {
-		fmt.Printf("Open ports is too many(%d), if you want use nmap You can add the -n to config maxOutputPortNum", portnum)
+		fmt.Printf("Open ports is too many(%d), if you want use nmap You can add the -n to config maxOutputPortNum", opennum)
 	}
 }
